@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>نظام التسجيل والطاقة الاستيعابية</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Noto+Kufi+Arabic:wght@600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<style>
+/* Layout idea: navy brand rail (like the Andalus wordmark) + light operational workspace; tables first, status encoded as pills + row stripes. Single light theme so the navy logos always read. */
+:root{
+  --navy:#232c6b; --navy-2:#2f3a85; --ink:#1b1f3b; --muted:#5d6385; --faint:#8a8fab;
+  --line:#e2e4ee; --bg:#f3f4f9; --surface:#ffffff; --tint:#eef0f8;
+  --blue:#2a94c8; --pink:#e0647a; --gold:#f0b330;
+  --good:#1d7f55; --good-bg:#e5f4ec; --warn:#9a6511; --warn-bg:#fdf1d6; --crit:#b42a43; --crit-bg:#fbe4e8; --off:#7b8098; --off-bg:#eef0f4;
+  --display:"Noto Kufi Arabic","IBM Plex Sans Arabic",Tahoma,sans-serif;
+  --body:"IBM Plex Sans Arabic",Tahoma,"Segoe UI",sans-serif;
+  --r:12px;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.55}
+button,input,select,textarea{font:inherit;color:inherit}
+.app{display:grid;grid-template-columns:250px 1fr;min-height:100%}
+/* side rail */
+.side{background:var(--navy);color:#fff;display:flex;flex-direction:column;gap:18px;padding:18px 14px;position:sticky;top:0;height:100vh;overflow:auto}
+.brand{background:#fff;border-radius:14px;padding:14px 12px;display:flex;justify-content:center}
+.brand img{width:100%;max-width:190px;height:auto;display:block}
+.nav{display:flex;flex-direction:column;gap:4px}
+.nav .grp{font-size:12px;color:#aab0d8;padding:12px 10px 4px;letter-spacing:.2px}
+.nav a{display:flex;align-items:center;gap:10px;color:#e8eaf8;text-decoration:none;padding:9px 10px;border-radius:10px;font-weight:500}
+.nav a:hover{background:rgba(255,255,255,.08)}
+.nav a.on{background:#fff;color:var(--navy);font-weight:700}
+.nav a .ic{width:26px;height:26px;display:grid;place-items:center;flex:none;border-radius:7px;background:#fff}
+.nav a .ic img{width:20px;height:20px;object-fit:contain}
+.nav a .ic svg{width:17px;height:17px;stroke:var(--navy)}
+.nav a .cnt{margin-inline-start:auto;font-size:12px;background:rgba(255,255,255,.15);padding:0 8px;border-radius:20px;font-variant-numeric:tabular-nums}
+.nav a.on .cnt{background:var(--tint)}
+.side .foot{margin-top:auto;font-size:12px;color:#aab0d8;padding:0 6px}
+/* main */
+main{min-width:0;display:flex;flex-direction:column}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;padding:16px 28px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.top h1{font-family:var(--display);font-size:20px;margin:0;color:var(--navy);text-wrap:balance}
+.top .sub{font-size:13px;color:var(--muted)}
+.top .spacer{flex:1}
+.ctl{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sel{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:7px 10px;min-height:38px}
+.btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:7px 13px;min-height:38px;cursor:pointer;font-weight:600;color:var(--ink)}
+.btn:hover{border-color:#c5c9de;background:#fafbff}
+.btn svg{width:16px;height:16px;stroke:currentColor}
+.btn.pri{background:var(--navy);border-color:var(--navy);color:#fff}
+.btn.pri:hover{background:var(--navy-2)}
+.btn.danger{background:var(--crit);border-color:var(--crit);color:#fff}
+.btn.sm{min-height:30px;padding:4px 10px;font-size:13px}
+.btn.ghost{border-color:transparent;background:transparent}
+.btn:focus-visible,.sel:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{outline:3px solid #9fb7ff;outline-offset:1px}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;border-radius:20px;padding:3px 10px;background:var(--tint);color:var(--navy)}
+.chip.view{background:#f1f1f4;color:var(--muted)}
+.sync{font-size:12px;color:var(--muted);display:inline-flex;gap:6px;align-items:center}
+.sync i{width:8px;height:8px;border-radius:50%;background:var(--good);display:inline-block}
+.sync.busy i{background:var(--gold)} .sync.err i{background:var(--crit)}
+#view{padding:22px 28px 40px;display:flex;flex-direction:column;gap:18px}
+/* cards */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px}
+.card h2{font-family:var(--display);font-size:16px;margin:0 0 12px;color:var(--navy);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.card h2 .note{font-family:var(--body);font-weight:400;font-size:13px;color:var(--muted)}
+.head{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.head img{height:64px;width:auto}
+.head h2{font-family:var(--display);font-size:22px;margin:0;color:var(--navy)}
+.head p{margin:2px 0 0;color:var(--muted);font-size:13px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:12px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;border-top:4px solid var(--navy)}
+.tile .l{font-size:13px;color:var(--muted)}
+.tile .v{font-family:var(--display);font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.3}
+.tile .h{font-size:12px;color:var(--faint)}
+.tile.b{border-top-color:var(--blue)} .tile.p{border-top-color:var(--pink)} .tile.g{border-top-color:var(--gold)} .tile.ok{border-top-color:var(--good)} .tile.cr{border-top-color:var(--crit)}
+.tile.cr .v{color:var(--crit)}
+/* tables */
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{padding:8px 10px;text-align:center;border-bottom:1px solid var(--line);white-space:nowrap}
+th{background:var(--navy);color:#fff;font-weight:600;font-size:13.5px;position:sticky;top:0}
+td.name{text-align:start;font-weight:600}
+td.stage{background:var(--tint);color:var(--navy);font-weight:700;white-space:normal;min-width:110px;border-inline-start:1px solid var(--line)}
+tr.tot td{background:#e9ecf7;font-weight:700;color:var(--navy);border-bottom:0}
+tbody tr.r-crit td:not(.stage){background:var(--crit-bg)}
+tbody tr.r-warn td:not(.stage){background:var(--warn-bg)}
+tbody tr.r-off td:not(.stage){color:var(--faint)}
+tbody tr.r-crit td.name{box-shadow:inset -4px 0 0 var(--crit)}
+tbody tr.r-warn td.name{box-shadow:inset -4px 0 0 var(--gold)}
+tbody tr.r-good td.name{box-shadow:inset -4px 0 0 var(--good)}
+td.vac{font-weight:700}
+td.vac.crit{color:var(--crit)} td.vac.warn{color:var(--warn)} td.vac.good{color:var(--good)}
+td.vac small{display:block;font-size:11px;font-weight:600}
+input.num{width:78px;text-align:center;border:1px solid var(--line);border-radius:8px;padding:5px 6px;background:#fff;font-variant-numeric:tabular-nums}
+input.num:hover{border-color:#b9bed6}
+input.num.saving{border-color:var(--gold)} input.num.saved{border-color:var(--good)}
+.pill{display:inline-flex;align-items:center;gap:5px;border-radius:20px;padding:2px 10px;font-size:12.5px;font-weight:700}
+.pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.pill.good{background:var(--good-bg);color:var(--good)} .pill.warn{background:var(--warn-bg);color:var(--warn)} .pill.crit{background:var(--crit-bg);color:var(--crit)} .pill.off{background:var(--off-bg);color:var(--off)}
+.occ{display:flex;align-items:center;gap:8px;min-width:120px}
+.occ .bar{flex:1;height:8px;background:#e7e9f2;border-radius:4px;overflow:hidden;position:relative}
+.occ .bar b{position:absolute;inset-block:0;inset-inline-start:0;background:var(--navy);border-radius:4px}
+.occ .bar b.over{background:var(--crit)}
+.occ span{font-size:12px;color:var(--muted);width:38px;text-align:end}
+.legend{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;color:var(--muted)}
+.alert{display:flex;gap:12px;align-items:flex-start;border-radius:var(--r);padding:12px 16px;background:#e8f3fb;border:1px solid #bfdcef;color:#174e6b}
+.alert svg{width:20px;height:20px;flex:none;stroke:currentColor;margin-top:2px}
+.alert b{font-weight:700}
+.alert ul{margin:4px 0 0;padding-inline-start:18px}
+.alert a{color:inherit;font-weight:700}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:1.25fr 1fr;gap:18px}
+.chart .row{display:grid;grid-template-columns:120px 1fr 120px;gap:10px;align-items:center;padding:7px 0;cursor:default}
+.chart .lab{font-weight:600;font-size:14px}
+.chart .track{height:16px;background:#e7e9f2;border-radius:0 4px 4px 0;position:relative}
+.chart .fill{position:absolute;inset-block:0;inset-inline-start:0;background:var(--navy);border-radius:4px 0 0 4px}
+.chart .fill.over{background:var(--crit)}
+.chart .val{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.chart .grid{position:absolute;inset-block:-4px;width:1px;background:#c9cde0}
+.chart .axis{display:grid;grid-template-columns:120px 1fr 120px;gap:10px;font-size:11px;color:var(--faint)}
+.chart .axis div:nth-child(2){display:flex;justify-content:space-between}
+.tip{position:fixed;z-index:50;background:var(--ink);color:#fff;border-radius:8px;padding:8px 10px;font-size:12.5px;pointer-events:none;max-width:260px;line-height:1.6;display:none}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px 12px;align-items:end}
+.form label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);font-weight:500}
+.form input,.form select,.form textarea,.fld{border:1px solid var(--line);border-radius:9px;padding:8px 10px;background:#fff;min-height:38px;width:100%}
+.form .wide{grid-column:1/-1}
+.chk{display:flex!important;flex-direction:row!important;align-items:center;gap:8px;color:var(--ink)!important}
+.chk input{width:auto;min-height:0}
+textarea.notes{width:100%;min-height:90px;border:1px solid var(--line);border-radius:9px;padding:10px;resize:vertical;background:#fff}
+.notes-ro{white-space:pre-wrap;color:var(--ink);min-height:24px}
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.filters .fld{width:auto;min-width:150px}
+.muted{color:var(--muted)} .small{font-size:12.5px}
+.foot-meta{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:12.5px;color:var(--muted)}
+.modal-bg{position:fixed;inset:0;background:rgba(20,24,50,.45);display:none;align-items:center;justify-content:center;z-index:40;padding:16px}
+.modal-bg.on{display:flex}
+.modal{background:#fff;border-radius:14px;max-width:520px;width:100%;padding:20px;display:flex;flex-direction:column;gap:14px;max-height:90vh;overflow:auto}
+.modal h3{margin:0;font-family:var(--display);font-size:17px;color:var(--navy)}
+.modal .acts{display:flex;gap:8px;justify-content:flex-start}
+.toast{position:fixed;bottom:18px;left:18px;z-index:60;background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;transform:translateY(8px);transition:.2s;pointer-events:none}
+.toast.on{opacity:1;transform:none}
+.toast.err{background:var(--crit)}
+.iconbtn{border:0;background:transparent;cursor:pointer;padding:4px;border-radius:6px;color:var(--crit)}
+.iconbtn:hover{background:var(--crit-bg)}
+.iconbtn svg{width:16px;height:16px;stroke:currentColor}
+a.rowlink{color:var(--navy);font-weight:700;text-decoration:none}
+a.rowlink:hover{text-decoration:underline}
+@media (max-width:980px){.grid2{grid-template-columns:1fr}}
+@media (max-width:820px){
+  .app{grid-template-columns:1fr}
+  .side{position:static;height:auto;flex-direction:row;align-items:center;overflow-x:auto;padding:10px;gap:10px}
+  .brand{padding:6px 10px;flex:none}.brand img{max-width:110px}
+  .nav{flex-direction:row}.nav .grp,.side .foot{display:none}
+  .nav a{white-space:nowrap;padding:7px 10px}
+  .top{position:static;padding:12px 16px}
+  #view{padding:16px}
+  .chart .row,.chart .axis{grid-template-columns:90px 1fr 92px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><img src="logos/company.png" alt="شركة الأندلس التعليمية"></div>
+    <nav class="nav" id="nav"></nav>
+    <div class="foot">مجمع المنار · نظام إدارة التسجيل والقبول</div>
+  </aside>
+  <main>
+    <header class="top">
+      <div>
+        <h1 id="pageTitle">اللوحة التجميعية</h1>
+        <div class="sub">نظام إدخال بيانات التسجيل والطاقة الاستيعابية</div>
+      </div>
+      <div class="spacer"></div>
+      <div class="ctl">
+        <label class="small muted" for="yearSel">العام الدراسي</label>
+        <select id="yearSel" class="sel"></select>
+        <button class="btn sm" id="addYearBtn" hidden><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>عام جديد</button>
+      </div>
+      <div class="ctl">
+        <button class="btn" id="xlsBtn"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v3h16v-3"/></svg>تصدير Excel</button>
+        <button class="btn" id="printBtn"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M6 9V3h12v6M6 18H4v-7h16v7h-2M8 14h8v7H8z"/></svg>تقرير للطباعة</button>
+      </div>
+      <div class="ctl">
+        <span class="chip view" id="roleChip">جاري التحقق…</span>
+        <span class="small muted" id="whoName"></span>
+        <button class="btn sm" id="signOutBtn" hidden>تسجيل الخروج</button>
+        <span class="sync" id="sync"><i></i><span>جاري التحميل…</span></span>
+      </div>
+    </header>
+    <div id="view"><div class="card empty">جاري تحميل البيانات…</div></div>
+  </main>
+</div>
+<div class="modal-bg" id="modalBg"><div class="modal" role="dialog" aria-modal="true" id="modal"></div></div>
+<div class="toast" id="toast"></div>
+<div class="tip" id="tip"></div>
+<script>
+"use strict";
+/* ---------- structure (department & grade template; data lives in the db) ---------- */
+const DEPTS=[
+ {key:'ahlib',hash:'ahli-boys',name:'الأهلي - بنين',logo:'ahli',kind:'الأهلي',grades:[
+  ['ثالث ابتدائي','المرحلة الابتدائية'],['رابع ابتدائي','المرحلة الابتدائية'],['خامس ابتدائي','المرحلة الابتدائية'],['سادس ابتدائي','المرحلة الابتدائية'],
+  ['أول متوسط','المتوسطة والثانوية'],['ثاني متوسط','المتوسطة والثانوية'],['ثالث متوسط','المتوسطة والثانوية'],['أول ثانوي','المتوسطة والثانوية']]},
+ {key:'intlb',hash:'intl-boys',name:'العالمي - بنين',logo:'intl',kind:'العالمي',grades:[
+  ['G3','المرحلة الابتدائية'],['G4','المرحلة الابتدائية'],['G5','المرحلة الابتدائية'],['G6','المرحلة الابتدائية'],['G7','المرحلة المتوسطة']]},
+ {key:'ahlig',hash:'ahli-girls',name:'الأهلي - بنات',logo:'ahli',kind:'الأهلي',grades:[
+  ['براعم القرآن بنات','المرحلة الابتدائية'],['براعم القرآن بنين','المرحلة الابتدائية'],['أول ابتدائي','المرحلة الابتدائية'],['أول إسناد','المرحلة الابتدائية'],
+  ['ثاني ابتدائي','المرحلة الابتدائية'],['ثاني إسناد','المرحلة الابتدائية'],['براعم القرآن بنات 2','المرحلة الابتدائية'],['براعم القرآن بنين 2','المرحلة الابتدائية'],
+  ['ثالث ابتدائي','المرحلة الابتدائية'],['رابع ابتدائي','المرحلة الابتدائية'],['خامس ابتدائي','المرحلة الابتدائية'],['سادس ابتدائي','المرحلة الابتدائية'],
+  ['أول متوسط','المتوسطة والثانوية'],['ثاني متوسط','المتوسطة والثانوية'],['ثالث متوسط','المتوسطة والثانوية'],['أول ثانوي','المتوسطة والثانوية']]},
+ {key:'intlg',hash:'intl-girls',name:'العالمي - بنات',logo:'intl',kind:'العالمي',grades:[
+  ['G1','المرحلة الابتدائية'],['G1 إسناد','المرحلة الابتدائية'],['G2','المرحلة الابتدائية'],['G2 إسناد','المرحلة الابتدائية'],
+  ['G3','المرحلة الابتدائية'],['G4','المرحلة الابتدائية'],['G5','المرحلة الابتدائية'],['G6','المرحلة الابتدائية'],['G7','المرحلة المتوسطة']]},
+ {key:'kg',hash:'kg',name:'رياض الأطفال',logo:'kg',kind:'الأندلس الصغيرة',grades:[
+  ['KG1','رياض الأطفال'],['KG2','رياض الأطفال'],['KG3 أهلي','رياض الأطفال'],['KG3 عالمي','رياض الأطفال']]}
+];
+const DEPT=Object.fromEntries(DEPTS.map(d=>[d.key,d]));
+const FIELD_LABEL={sections:'عدد الفصول',capacity:'الطاقة الاستيعابية',current:'الطلاب الحاليون',waitlist:'قائمة الانتظار'};
+const ICON={
+ dash:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>',
+ wait:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+ out:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg>',
+ log:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M5 4h14v16H5zM8 9h8M8 13h8M8 17h5"/></svg>',
+ info:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v5h1"/></svg>',
+ trash:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>'
+};
+const VIEWS=[
+ {hash:'dashboard',title:'اللوحة التجميعية',icon:ICON.dash,grp:'عام'},
+ ...DEPTS.map(d=>({hash:d.hash,title:d.name,dept:d.key,img:`logos/${d.logo}-icon.png`,grp:'الأقسام'})),
+ {hash:'waitlist',title:'قائمة الانتظار',icon:ICON.wait,grp:'سجلات مستقلة'},
+ {hash:'withdrawals',title:'المنسحبون',icon:ICON.out,grp:'سجلات مستقلة'},
+ {hash:'log',title:'سجل التغييرات',icon:ICON.log,grp:'سجلات مستقلة'},
+ {hash:'users',title:'المستخدمون والصلاحيات',icon:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 4.5a3.5 3.5 0 010 7M18 14c2 .6 3 2.6 3 6"/></svg>',grp:'الإدارة',editorOnly:true}
+];
+
+/* ---------- state ---------- */
+const S={db:null,user:null,dl:null,canEdit:false,me:null,years:[],yearId:null,grades:{},wd:[],notes:{},log:[],names:{},
+  ready:{years:false,grades:false},yearUnsubs:[],manage:false,wdFilter:{dept:'',grade:'',q:''},waitDept:''};
+const $=s=>document.querySelector(s);
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num=v=>{const n=Number(v);return Number.isFinite(n)?n:0};
+const fmt=n=>num(n).toLocaleString('en-US');
+const signed=n=>n<0?'\u2066−'+fmt(-n)+'\u2069':fmt(n);
+const nowIso=()=>new Date().toISOString();
+const todayStr=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const fmtTime=iso=>{if(!iso)return'';try{return new Date(iso).toLocaleString('ar-SA-u-nu-latn-ca-gregory',{weekday:'long',year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}catch(e){return iso}};
+const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
+const lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
+
+function stat(g){
+  const cap=num(g.capacity),cur=num(g.current),vac=cap-cur;
+  if(cap===0&&cur===0)return{k:'off',label:'غير مفعّل',vac};
+  if(vac<=0)return{k:'crit',label:'إغلاق التسجيل',vac};
+  if(vac<=3)return{k:'warn',label:'اعتذار من الزيادة',vac};
+  return{k:'good',label:'مفتوح للتسجيل',vac};
+}
+const gradesOf=dk=>Object.values(S.grades).filter(g=>g.dept===dk).sort((a,b)=>num(a.order)-num(b.order));
+function sum(list){
+  const t={sections:0,capacity:0,current:0,vacant:0,over:0,waitlist:0,closed:0,warn:0};
+  list.forEach(g=>{const s=stat(g);t.sections+=num(g.sections);t.capacity+=num(g.capacity);t.current+=num(g.current);t.waitlist+=num(g.waitlist);
+    if(s.vac>0)t.vacant+=s.vac;else t.over+=-s.vac; if(s.k==='crit')t.closed++; if(s.k==='warn')t.warn++;});
+  t.net=t.capacity-t.current; t.pct=t.capacity?Math.round(t.current/t.capacity*100):0; return t;
+}
+const alertsFor=list=>list.filter(g=>stat(g).vac>0&&num(g.waitlist)>0);
+const wdCount=(dk,gid)=>S.wd.filter(w=>(!dk||w.dept===dk)&&(!gid||w.gradeId===gid)).length;
+const yearLabel=()=>(S.years.find(y=>y.id===S.yearId)||{}).label||'';
+
+/* ---------- ui helpers ---------- */
+let toastT;
+function toast(msg,err){const t=$('#toast');t.textContent=msg;t.className='toast on'+(err?' err':'');clearTimeout(toastT);toastT=setTimeout(()=>t.className='toast',2600)}
+function setSync(state,text){const s=$('#sync');s.className='sync'+(state?' '+state:'');s.lastElementChild.textContent=text}
+let pending=0;
+function track(p){pending++;setSync('busy','جاري الحفظ…');return p.then(r=>{pending--;if(!pending)setSync('','تم الحفظ');return r},e=>{pending--;setSync('err','تعذّر الحفظ');throw e})}
+function openModal({title,body,submit,onSubmit,danger}){
+  const m=$('#modal');
+  m.innerHTML=`<h3>${esc(title)}</h3><form id="mForm" class="form">${body}</form><div class="acts"><button class="btn ${danger?'danger':'pri'}" id="mOk">${esc(submit||'حفظ')}</button><button class="btn" id="mCancel">إلغاء</button></div>`;
+  $('#modalBg').classList.add('on');
+  const f=$('#mForm');const first=f.querySelector('input,select,textarea');if(first)first.focus();else $('#mOk').focus();
+  const close=()=>$('#modalBg').classList.remove('on');
+  $('#mCancel').onclick=close;
+  const go=async e=>{e&&e.preventDefault();const ok=$('#mOk');ok.disabled=true;try{const r=await onSubmit(new FormData(f));if(r!==false)close()}catch(err){toast(errMsg(err),true)}finally{ok.disabled=false}};
+  $('#mOk').onclick=go;f.onsubmit=go;
+}
+$('#modalBg').addEventListener('click',e=>{if(e.target.id==='modalBg')$('#modalBg').classList.remove('on')});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#modalBg').classList.remove('on')});
+function errMsg(e){const c=e&&e.code;if(c==='permission-denied'||c==='invalid_argument')return'ليست لديك صلاحية التعديل.';if(c==='quota_exceeded')return'امتلأت مساحة قاعدة البيانات. احذف سجلات قديمة ثم أعد المحاولة.';if(c==='resource_exhausted')return'طلبات كثيرة في وقت قصير. انتظر لحظات ثم أعد المحاولة.';return'تعذّر الحفظ. تحقق من الاتصال ثم أعد المحاولة.'}
+
+/* ---------- nav & routing ---------- */
+function currentView(){const h=location.hash.replace('#','');const v=VIEWS.find(v=>v.hash===h);return v&&(!v.editorOnly||S.canEdit)?v:VIEWS[0]}
+function renderNav(){
+  const cur=currentView().hash;let grp='';let h='';
+  for(const v of VIEWS){
+    if(v.editorOnly&&!S.canEdit)continue;
+    if(v.grp!==grp){grp=v.grp;h+=`<div class="grp">${esc(grp)}</div>`}
+    let cnt='';
+    if(v.dept){const t=sum(gradesOf(v.dept));if(Object.keys(S.grades).length)cnt=`<span class="cnt" title="الطلاب الحاليون">${fmt(t.current)}</span>`}
+    if(v.hash==='waitlist'){const t=sum(Object.values(S.grades));cnt=`<span class="cnt">${fmt(t.waitlist)}</span>`}
+    if(v.hash==='withdrawals')cnt=`<span class="cnt">${fmt(S.wd.length)}</span>`;
+    const ic=v.img?`<span class="ic"><img src="${v.img}" alt=""></span>`:`<span class="ic">${v.icon}</span>`;
+    h+=`<a href="#${v.hash}" class="${v.hash===cur?'on':''}">${ic}<span>${esc(v.title)}</span>${cnt}</a>`;
+  }
+  $('#nav').innerHTML=h;
+}
+window.addEventListener('hashchange',()=>{scheduleRender();window.scrollTo(0,0)});
+
+/* ---------- render ---------- */
+let rq=false;
+function scheduleRender(){if(rq)return;rq=true;requestAnimationFrame(()=>{rq=false;render()})}
+function render(){
+  const v=currentView();
+  $('#pageTitle').textContent=v.title;
+  renderNav();renderYears();
+  const ae=document.activeElement;let keep=null;
+  if(ae&&ae.id&&$('#view').contains(ae)&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'||ae.tagName==='SELECT'))keep={id:ae.id,val:ae.value,s:ae.selectionStart,e:ae.selectionEnd};
+  $('#xlsBtn').hidden=$('#printBtn').hidden=!!S.gate;$('#yearSel').hidden=!!S.gate;
+  if(S.gate){$('#view').innerHTML=S.gate;const b=$('#signInBtn');if(b)b.onclick=signIn;return}
+  if(!S.db){$('#view').innerHTML=`<div class="card empty">جاري الاتصال بقاعدة البيانات…</div>`;return}
+  if(!S.ready.years){$('#view').innerHTML=`<div class="card empty">${S.slow?'تعذّر الوصول إلى البيانات حتى الآن. تحقق من الاتصال.':'جاري تحميل البيانات…'}</div>`;return}
+  if(!S.years.length){
+    $('#view').innerHTML=`<div class="card empty"><p>لا يوجد عام دراسي بعد.</p>${S.canEdit?'<div class="ctl" style="justify-content:center"><button class="btn pri" id="seedYear">إنشاء العام 1448 هـ بالبيانات الأولية</button><button class="btn" id="firstYear">إنشاء عام فارغ</button></div><p class="small">البيانات الأولية: صفوف كل الأقسام، وأرقام الأهلي بنين من الجدول السابق.</p>':'<p class="small">سيظهر المحتوى عندما يضيف المدير بيانات العام الدراسي.</p>'}</div>`;
+    const b=$('#firstYear');if(b)b.onclick=addYearDialog;const sb=$('#seedYear');if(sb)sb.onclick=seedFirstYear;return;
+  }
+  let html='';
+  if(v.hash==='dashboard')html=viewDashboard();
+  else if(v.dept)html=viewDept(v.dept);
+  else if(v.hash==='waitlist')html=viewWaitlist();
+  else if(v.hash==='withdrawals')html=viewWithdrawals();
+  else if(v.hash==='log')html=viewLog();
+  else if(v.hash==='users')html=viewUsers();
+  $('#view').innerHTML=html;
+  if(v.hash==='withdrawals')bindWdForm();
+  if(v.hash==='users')bindUsers();
+  if(keep){const el=document.getElementById(keep.id);if(el){if(el.value!==keep.val)el.value=keep.val;el.focus();try{el.setSelectionRange(keep.s,keep.e)}catch(e){}}}
+}
+function renderYears(){
+  const sel=$('#yearSel');
+  const opts=S.years.map(y=>`<option value="${esc(y.id)}"${y.id===S.yearId?' selected':''}>${esc(y.label)}</option>`).join('');
+  if(sel.dataset.h!==opts){sel.innerHTML=opts||'<option>—</option>';sel.dataset.h=opts}
+  $('#addYearBtn').hidden=!S.canEdit;
+}
+const legendHtml=`<div class="legend"><span class="pill good">مفتوح للتسجيل</span><span class="pill warn">اعتذار من الزيادة · 3 مقاعد أو أقل</span><span class="pill crit">إغلاق التسجيل · لا مقاعد أو زيادة</span></div>`;
+
+function tilesHtml(t,extra){
+  return `<div class="tiles">
+   <div class="tile"><div class="l">عدد الفصول</div><div class="v">${fmt(t.sections)}</div></div>
+   <div class="tile b"><div class="l">الطاقة الاستيعابية</div><div class="v">${fmt(t.capacity)}</div></div>
+   <div class="tile p"><div class="l">الطلاب الحاليون</div><div class="v">${fmt(t.current)}</div><div class="h">نسبة الإشغال ${t.pct}%</div></div>
+   <div class="tile ok"><div class="l">المقاعد الشاغرة</div><div class="v">${fmt(t.vacant)}</div><div class="h">مجموع الصفوف التي بها مقاعد</div></div>
+   <div class="tile cr"><div class="l">الزيادة عن الطاقة</div><div class="v">${fmt(t.over)}</div><div class="h">${fmt(t.closed)} صف مغلق</div></div>
+   ${extra||''}</div>`;
+}
+function waitAlertHtml(list,showDept){
+  const a=alertsFor(list);if(!a.length)return'';
+  return `<div class="alert" role="status">${ICON.info}<div><b>يوجد مقاعد شاغرة وطلاب في قائمة الانتظار</b><ul>${a.map(g=>`<li>${showDept?esc(DEPT[g.dept]?.name)+' · ':''}${esc(g.name)}: ${fmt(stat(g).vac)} مقعد شاغر، و${fmt(g.waitlist)} في الانتظار</li>`).join('')}</ul><a href="#waitlist">فتح قائمة الانتظار</a></div></div>`;
+}
+
+/* dashboard */
+function viewDashboard(){
+  const all=Object.values(S.grades);const t=sum(all);
+  if(!S.ready.grades)return`<div class="card empty">جاري تحميل الصفوف…</div>`;
+  const rows=DEPTS.map(d=>{const s=sum(gradesOf(d.key));return{d,s}});
+  let h=tilesHtml(t,`<div class="tile g"><div class="l">قائمة الانتظار</div><div class="v">${fmt(t.waitlist)}</div></div><div class="tile"><div class="l">المنسحبون</div><div class="v">${fmt(S.wd.length)}</div></div>`);
+  h+=waitAlertHtml(all,true);
+  h+=`<div class="card"><h2>ملخص الأقسام <span class="note">العام الدراسي ${esc(yearLabel())}</span></h2><div class="tw"><table><thead><tr><th>القسم</th><th>عدد الفصول</th><th>الطاقة الاستيعابية</th><th>الطلاب الحاليون</th><th>المقاعد الشاغرة</th><th>الزيادة</th><th>نسبة الإشغال</th><th>قائمة الانتظار</th><th>المنسحبون</th><th>صفوف مغلقة</th></tr></thead><tbody>
+  ${rows.map(({d,s})=>`<tr><td class="name"><a class="rowlink" href="#${d.hash}">${esc(d.name)}</a></td><td>${fmt(s.sections)}</td><td>${fmt(s.capacity)}</td><td>${fmt(s.current)}</td><td class="vac good">${fmt(s.vacant)}</td><td class="vac ${s.over?'crit':''}">${fmt(s.over)}</td><td>${occ(s.current,s.capacity)}</td><td>${fmt(s.waitlist)}</td><td>${fmt(wdCount(d.key))}</td><td>${s.closed?`<span class="pill crit">${fmt(s.closed)}</span>`:'<span class="muted">0</span>'}</td></tr>`).join('')}
+  <tr class="tot"><td>الإجمالي</td><td>${fmt(t.sections)}</td><td>${fmt(t.capacity)}</td><td>${fmt(t.current)}</td><td>${fmt(t.vacant)}</td><td>${fmt(t.over)}</td><td>${t.pct}%</td><td>${fmt(t.waitlist)}</td><td>${fmt(S.wd.length)}</td><td>${fmt(t.closed)}</td></tr></tbody></table></div></div>`;
+  // chart + closed list
+  const max=Math.max(100,...rows.map(r=>r.s.pct));const scale=Math.ceil(max/25)*25;
+  const ticks=[];for(let i=0;i<=scale;i+=25)ticks.push(i);
+  const chart=`<div class="card chart"><h2>نسبة الإشغال حسب القسم <span class="note">الطلاب الحاليون ÷ الطاقة الاستيعابية</span></h2>
+   ${rows.map(({d,s})=>`<div class="row" data-tip="${esc(d.name)}&#10;الطاقة: ${fmt(s.capacity)} · الحاليون: ${fmt(s.current)}&#10;الشاغرة: ${fmt(s.vacant)} · الزيادة: ${fmt(s.over)}"><div class="lab">${esc(d.name)}</div><div class="track"><div class="fill ${s.pct>100?'over':''}" style="width:${s.capacity?Math.min(s.pct,scale)/scale*100:0}%"></div><div class="grid" style="inset-inline-start:${100/scale*100}%"></div></div><div class="val">${s.pct}% · ${fmt(s.current)}/${fmt(s.capacity)}</div></div>`).join('')}
+   <div class="axis"><div></div><div>${ticks.map(x=>`<span>${x}%</span>`).join('')}</div><div></div></div>
+   <p class="small muted" style="margin:8px 0 0">الخط الرأسي = 100% من الطاقة الاستيعابية. الشريط الأحمر يعني تجاوز الطاقة.</p></div>`;
+  const closed=all.filter(g=>stat(g).k==='crit'||stat(g).k==='warn').sort((a,b)=>stat(a).vac-stat(b).vac);
+  const closedHtml=`<div class="card"><h2>صفوف تحتاج انتباه</h2>${closed.length?`<div class="tw"><table><thead><tr><th>القسم</th><th>الصف</th><th>الشاغرة</th><th>الحالة</th></tr></thead><tbody>${closed.map(g=>{const s=stat(g);return`<tr><td>${esc(DEPT[g.dept]?.name)}</td><td class="name">${esc(g.name)}</td><td class="vac ${s.k}">${signed(s.vac)}</td><td><span class="pill ${s.k}">${s.label}</span></td></tr>`}).join('')}</tbody></table></div>`:'<p class="muted">كل الصفوف المفعّلة بها أكثر من 3 مقاعد شاغرة.</p>'}</div>`;
+  h+=`<div class="grid2">${chart}${closedHtml}</div>`;
+  return h;
+}
+function occ(cur,cap){const p=cap?Math.round(cur/cap*100):0;return`<div class="occ"><div class="bar"><b class="${p>100?'over':''}" style="width:${Math.min(p,100)}%"></b></div><span>${cap?p+'%':'—'}</span></div>`}
+
+/* department */
+function cellNum(g,f){
+  const v=num(g[f]);
+  if(!S.canEdit)return fmt(v);
+  return`<input class="num" type="number" min="0" step="1" inputmode="numeric" id="in-${esc(g.id)}-${f}" data-id="${esc(g.id)}" data-field="${f}" value="${v}" aria-label="${esc(g.name)} - ${FIELD_LABEL[f]}">`;
+}
+function viewDept(dk){
+  const d=DEPT[dk];if(!S.ready.grades)return`<div class="card empty">جاري تحميل الصفوف…</div>`;
+  const list=gradesOf(dk);const t=sum(list);
+  let h=`<div class="head"><img src="logos/${d.logo}.png" alt="${esc(d.kind)}"><div><h2>${esc(d.name)}</h2><p>مجمع المنار · العام الدراسي ${esc(yearLabel())}</p></div></div>`;
+  h+=tilesHtml(t);
+  h+=waitAlertHtml(list,false);
+  let rows='';let lastStage=null;
+  const spans={};list.forEach(g=>spans[g.stage]=(spans[g.stage]||0)+1);
+  // keep stages contiguous in display order
+  list.forEach((g,i)=>{
+    const s=stat(g);let stageTd='';
+    if(g.stage!==lastStage){let n=0;for(let j=i;j<list.length&&list[j].stage===g.stage;j++)n++;stageTd=`<td class="stage" rowspan="${n}">${esc(g.stage||'—')}</td>`;lastStage=g.stage}
+    rows+=`<tr class="r-${s.k}">${stageTd}<td class="name">${esc(g.name)}</td><td>${cellNum(g,'sections')}</td><td>${cellNum(g,'capacity')}</td><td>${cellNum(g,'current')}</td>
+     <td class="vac ${s.k}">${signed(s.vac)}${s.vac<0?'<small>زيادة</small>':''}</td><td>${occ(num(g.current),num(g.capacity))}</td><td><span class="pill ${s.k}">${s.label}</span></td>
+     ${S.manage?`<td><button class="iconbtn" data-del-grade="${esc(g.id)}" aria-label="حذف ${esc(g.name)}">${ICON.trash}</button></td>`:''}</tr>`;
+  });
+  h+=`<div class="card"><h2>الصفوف والطاقة الاستيعابية <span class="note">${S.canEdit?'عدّل الأرقام مباشرة، ويُحفظ كل رقم عند الخروج من الخانة.':'عرض فقط'}</span></h2>
+   <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px">${legendHtml}
+   ${S.canEdit?`<div class="ctl">${S.manage?'<button class="btn sm pri" id="addGradeBtn">+ إضافة صف</button>':''}<button class="btn sm" id="manageBtn">${S.manage?'إنهاء تعديل القائمة':'تعديل قائمة الصفوف'}</button></div>`:''}</div>
+   ${list.length?`<div class="tw"><table><thead><tr><th>المرحلة</th><th>الصف</th><th>عدد الفصول</th><th>الطاقة الاستيعابية</th><th>الطلاب الحاليون</th><th>المقاعد الشاغرة</th><th>نسبة الإشغال</th><th>الحالة</th>${S.manage?'<th></th>':''}</tr></thead>
+   <tbody>${rows}<tr class="tot"><td colspan="2">الإجمالي</td><td>${fmt(t.sections)}</td><td>${fmt(t.capacity)}</td><td>${fmt(t.current)}</td><td>${signed(t.net)}</td><td>${t.pct}%</td><td>${t.closed?`${fmt(t.closed)} مغلق`:''}</td>${S.manage?'<td></td>':''}</tr></tbody></table></div>`:'<p class="empty">لا توجد صفوف في هذا القسم.</p>'}
+   <p class="small muted" style="margin:10px 0 0">المقاعد الشاغرة = الطاقة الاستيعابية − الطلاب الحاليون. إذا زاد الطلاب عن الطاقة تظهر الزيادة بإشارة سالبة. قائمة الانتظار والمنسحبون في صفحاتهم المستقلة.</p></div>`;
+  const note=S.notes[dk]||{};
+  h+=`<div class="card"><h2>ملاحظات القسم</h2>${S.canEdit?`<textarea class="notes" id="note-${dk}" data-note="${dk}" placeholder="مثال: أولياء أمور طلبوا التواصل، مواعيد، ملاحظات القبول…">${esc(note.text||'')}</textarea>`:`<div class="notes-ro">${esc(note.text||'لا توجد ملاحظات.')}</div>`}</div>`;
+  const last=list.reduce((m,g)=>g.updatedAt&&(!m||g.updatedAt>m.updatedAt)?g:m,null);
+  h+=`<div class="foot-meta"><span>${last?`آخر تحديث: ${esc(fmtTime(last.updatedAt))}${last.updatedByName?' · '+esc(last.updatedByName):''}`:''}</span><span>نظام إدارة التسجيل والقبول المدرسي</span></div>`;
+  return h;
+}
+
+/* waitlist */
+function viewWaitlist(){
+  if(!S.ready.grades)return`<div class="card empty">جاري تحميل الصفوف…</div>`;
+  const all=Object.values(S.grades);const t=sum(all);const a=alertsFor(all);
+  let h=`<div class="tiles"><div class="tile g"><div class="l">إجمالي قائمة الانتظار</div><div class="v">${fmt(t.waitlist)}</div></div>
+   <div class="tile ok"><div class="l">صفوف بها شاغر وانتظار</div><div class="v">${fmt(a.length)}</div><div class="h">يمكن قبول طلاب منها الآن</div></div>
+   ${DEPTS.map(d=>`<div class="tile"><div class="l">${esc(d.name)}</div><div class="v">${fmt(sum(gradesOf(d.key)).waitlist)}</div></div>`).join('')}</div>`;
+  h+=waitAlertHtml(all,true);
+  h+=`<div class="filters"><label class="small muted" for="waitDept" style="align-self:center">القسم</label><select class="fld" id="waitDept"><option value="">كل الأقسام</option>${DEPTS.map(d=>`<option value="${d.key}"${S.waitDept===d.key?' selected':''}>${esc(d.name)}</option>`).join('')}</select></div>`;
+  for(const d of DEPTS){
+    if(S.waitDept&&S.waitDept!==d.key)continue;
+    const list=gradesOf(d.key);const s=sum(list);
+    h+=`<div class="card"><h2><img src="logos/${d.logo}-icon.png" alt="" style="height:24px">${esc(d.name)} <span class="note">${fmt(s.waitlist)} في الانتظار</span></h2>
+    <div class="tw"><table><thead><tr><th>المرحلة</th><th>الصف</th><th>المقاعد الشاغرة</th><th>عدد قائمة الانتظار</th><th>التنبيه</th></tr></thead><tbody>
+    ${list.map(g=>{const st=stat(g);const w=num(g.waitlist);let al='<span class="muted">—</span>';
+      if(st.vac>0&&w>0)al=`<span class="pill good">يمكن قبول ${fmt(Math.min(st.vac,w))}</span>`;else if(w>0)al=`<span class="pill crit">لا مقاعد شاغرة</span>`;
+      return`<tr class="${st.vac>0&&w>0?'r-good':''}"><td class="small muted">${esc(g.stage)}</td><td class="name">${esc(g.name)}</td><td class="vac ${st.k}">${signed(st.vac)}</td><td>${cellNum(g,'waitlist')}</td><td>${al}</td></tr>`}).join('')}
+    <tr class="tot"><td colspan="2">الإجمالي</td><td>${signed(s.net)}</td><td>${fmt(s.waitlist)}</td><td></td></tr></tbody></table></div></div>`;
+  }
+  return h;
+}
+
+/* withdrawals */
+function stageOrder(dk){const seen=[];gradesOf(dk).forEach(g=>{if(!seen.includes(g.stage))seen.push(g.stage)});S.wd.forEach(w=>{if(w.dept===dk&&!seen.includes(w.stage))seen.push(w.stage)});return seen}
+function viewWithdrawals(){
+  const f=S.wdFilter;
+  // summary by department & stage
+  let sumRows='';
+  DEPTS.forEach(d=>{const stages=stageOrder(d.key);const tot=wdCount(d.key);
+    stages.forEach((st,i)=>{const n=S.wd.filter(w=>w.dept===d.key&&w.stage===st).length;
+      const gr=gradesOf(d.key).filter(g=>g.stage===st).map(g=>{const c=wdCount(d.key,g.id);return c?`${esc(g.name)} (${c})`:''}).filter(Boolean).join('، ');
+      sumRows+=`<tr>${i===0?`<td class="stage" rowspan="${stages.length}">${esc(d.name)}<div class="small">${fmt(tot)} منسحب</div></td>`:''}<td class="name">${esc(st)}</td><td>${fmt(n)}</td><td class="small muted" style="white-space:normal;text-align:start">${gr||'—'}</td></tr>`});
+  });
+  let h=`<div class="tiles"><div class="tile cr"><div class="l">إجمالي المنسحبين</div><div class="v">${fmt(S.wd.length)}</div><div class="h">العام الدراسي ${esc(yearLabel())}</div></div>${DEPTS.map(d=>`<div class="tile"><div class="l">${esc(d.name)}</div><div class="v">${fmt(wdCount(d.key))}</div></div>`).join('')}</div>`;
+  if(S.canEdit){
+    h+=`<div class="card"><h2>تسجيل طالب منسحب</h2><form class="form" id="wdForm">
+      <label>اسم الطالب<input id="wdName" name="name" required maxlength="120"></label>
+      <label>القسم<select id="wdDept" name="dept">${DEPTS.map(d=>`<option value="${d.key}">${esc(d.name)}</option>`).join('')}</select></label>
+      <label>الصف<select id="wdGrade" name="grade"></select></label>
+      <label>تاريخ الانسحاب<input id="wdDate" name="date" type="date" value="${todayStr()}" required></label>
+      <label class="wide">الملاحظات<input id="wdNotes" name="notes" maxlength="400" placeholder="سبب الانسحاب أو أي ملاحظة"></label>
+      <label class="chk wide"><input type="checkbox" id="wdDec" name="dec" checked> إنقاص عدد «الطلاب الحاليون» لهذا الصف بواحد تلقائياً</label>
+      <div><button class="btn pri" type="submit">حفظ المنسحب</button></div></form></div>`;
+  }
+  h+=`<div class="card"><h2>المنسحبون بتفصيل المراحل</h2><div class="tw"><table><thead><tr><th>القسم</th><th>المرحلة</th><th>عدد المنسحبين</th><th>حسب الصف</th></tr></thead><tbody>${sumRows}<tr class="tot"><td colspan="2">الإجمالي</td><td>${fmt(S.wd.length)}</td><td></td></tr></tbody></table></div></div>`;
+  let list=S.wd.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.createdAt||'').localeCompare(a.createdAt||''));
+  if(f.dept)list=list.filter(w=>w.dept===f.dept);
+  if(f.grade)list=list.filter(w=>w.gradeId===f.grade);
+  if(f.q)list=list.filter(w=>(w.name||'').includes(f.q)||(w.notes||'').includes(f.q));
+  const gopts=f.dept?gradesOf(f.dept).map(g=>`<option value="${esc(g.id)}"${f.grade===g.id?' selected':''}>${esc(g.name)}</option>`).join(''):'';
+  h+=`<div class="card"><h2>جدول المنسحبين <span class="note">${fmt(list.length)} سجل</span></h2>
+   <div class="filters"><input class="fld" id="wdQ" placeholder="بحث بالاسم أو الملاحظة" value="${esc(f.q)}"><select class="fld" id="wdFDept"><option value="">كل الأقسام</option>${DEPTS.map(d=>`<option value="${d.key}"${f.dept===d.key?' selected':''}>${esc(d.name)}</option>`).join('')}</select><select class="fld" id="wdFGrade"${f.dept?'':' disabled'}><option value="">كل الصفوف</option>${gopts}</select></div>
+   ${list.length?`<div class="tw"><table><thead><tr><th>#</th><th>اسم الطالب</th><th>القسم</th><th>الصف</th><th>تاريخ الانسحاب</th><th>الملاحظات</th>${S.canEdit?'<th></th>':''}</tr></thead><tbody>
+   ${list.map((w,i)=>`<tr><td class="muted">${i+1}</td><td class="name">${esc(w.name)}</td><td>${esc(DEPT[w.dept]?.name||w.dept)}</td><td>${esc(w.gradeName)}</td><td>${esc(w.date)}</td><td style="white-space:normal;text-align:start;min-width:180px">${esc(w.notes||'')}</td>${S.canEdit?`<td><button class="iconbtn" data-del-wd="${esc(w.id)}" aria-label="حذف ${esc(w.name)}">${ICON.trash}</button></td>`:''}</tr>`).join('')}
+   </tbody></table></div>`:'<p class="empty">لا توجد سجلات انسحاب.</p>'}</div>`;
+  return h;
+}
+function bindWdForm(){
+  const dSel=$('#wdDept'),gSel=$('#wdGrade');if(!dSel)return;
+  const fill=()=>{gSel.innerHTML=gradesOf(dSel.value).map(g=>`<option value="${esc(g.id)}">${esc(g.name)}</option>`).join('')};
+  if(S.wdDraft){dSel.value=S.wdDraft.dept;}
+  fill();
+  if(S.wdDraft){gSel.value=S.wdDraft.grade;$('#wdName').value=S.wdDraft.name;$('#wdDate').value=S.wdDraft.date;$('#wdNotes').value=S.wdDraft.notes;$('#wdDec').checked=S.wdDraft.dec}
+  const save=()=>{S.wdDraft={dept:dSel.value,grade:gSel.value,name:$('#wdName').value,date:$('#wdDate').value,notes:$('#wdNotes').value,dec:$('#wdDec').checked}};
+  dSel.onchange=()=>{fill();save()};$('#wdForm').oninput=save;
+  $('#wdForm').onsubmit=async e=>{
+    e.preventDefault();const name=$('#wdName').value.trim();if(!name){toast('اكتب اسم الطالب',true);return}
+    const g=S.grades[gSel.value];if(!g){toast('اختر الصف',true);return}
+    const rec={name,dept:dSel.value,gradeId:g.id,gradeName:g.name,stage:g.stage||'',date:$('#wdDate').value||todayStr(),notes:$('#wdNotes').value.trim(),createdAt:nowIso(),createdBy:S.me||null,createdByName:S.meName||''};
+    const btn=e.target.querySelector('button[type=submit]');btn.disabled=true;
+    try{
+      await track(S.db.collection(`y/${S.yearId}/withdrawals`).add(rec));
+      addLog(`تسجيل منسحب: ${name} · ${DEPT[rec.dept].name} · ${g.name}`);
+      if($('#wdDec').checked&&num(g.current)>0)await saveField(g.id,'current',num(g.current)-1,' (بسبب انسحاب)');
+      S.wdDraft=null;toast('تم حفظ المنسحب');scheduleRender();
+    }catch(err){toast(errMsg(err),true)}finally{btn.disabled=false}
+  };
+}
+
+/* log */
+function viewLog(){
+  return`<div class="card"><h2>سجل التغييرات <span class="note">آخر ${fmt(S.log.length)} تغيير، من كل الأعوام</span></h2>${S.log.length?`<div class="tw"><table><thead><tr><th>الوقت</th><th>المستخدم</th><th>العام</th><th>التغيير</th></tr></thead><tbody>
+  ${S.log.map(l=>`<tr><td class="small">${esc(fmtTime(l.at))}</td><td>${esc(l.byName||'—')}</td><td>${esc(l.yearLabel||'')}</td><td style="white-space:normal;text-align:start">${esc(l.text)}</td></tr>`).join('')}</tbody></table></div>`:'<p class="empty">لا توجد تغييرات مسجلة بعد.</p>'}</div>`;
+}
+
+/* ---------- writes ---------- */
+const chains={};
+function saveField(id,field,val,why){
+  const g=S.grades[id];if(!g)return Promise.resolve();
+  const old=num(g[field]);if(old===val)return Promise.resolve();
+  const p=(chains[id]||Promise.resolve()).then(()=>S.db.doc(`y/${S.yearId}/grades/${id}`).update({[field]:val,updatedAt:nowIso(),updatedBy:S.me||null,updatedByName:S.meName||""}));
+  chains[id]=p.catch(()=>{});
+  return track(p).then(()=>addLog(`${DEPT[g.dept]?.name} · ${g.name} · ${FIELD_LABEL[field]}: من ${fmt(old)} إلى ${fmt(val)}${why||''}`));
+}
+function addLog(text){
+  if(!S.db)return;
+  S.db.collection('log').add({at:nowIso(),by:S.me||null,byName:S.meName||'',year:S.yearId,yearLabel:yearLabel(),text}).catch(()=>{});
+}
+document.addEventListener('change',e=>{
+  const el=e.target;
+  if(el.matches('input.num[data-id]')){
+    const raw=el.value.trim();const v=Math.floor(Number(raw));
+    if(raw===''||!Number.isFinite(v)||v<0){toast('أدخل رقماً صحيحاً صفر أو أكبر',true);el.value=num(S.grades[el.dataset.id]?.[el.dataset.field]);return}
+    el.classList.add('saving');
+    saveField(el.dataset.id,el.dataset.field,v).then(()=>{el.classList.remove('saving');el.classList.add('saved')},err=>{el.classList.remove('saving');toast(errMsg(err),true);el.value=num(S.grades[el.dataset.id]?.[el.dataset.field])});
+  } else if(el.matches('textarea[data-note]')){
+    const dk=el.dataset.note;const text=el.value;if((S.notes[dk]||{}).text===text)return;
+    track(S.db.doc(`y/${S.yearId}/notes/${dk}`).set({text,updatedAt:nowIso(),updatedBy:S.me||null,updatedByName:S.meName||""})).then(()=>addLog(`تحديث ملاحظات ${DEPT[dk].name}`),err=>toast(errMsg(err),true));
+  } else if(el.id==='yearSel'){
+    selectYear(el.value);
+  } else if(el.id==='waitDept'){S.waitDept=el.value;scheduleRender()}
+  else if(el.id==='wdFDept'){S.wdFilter.dept=el.value;S.wdFilter.grade='';scheduleRender()}
+  else if(el.id==='wdFGrade'){S.wdFilter.grade=el.value;scheduleRender()}
+});
+document.addEventListener('input',e=>{if(e.target.id==='wdQ'){S.wdFilter.q=e.target.value.trim();clearTimeout(S.qT);S.qT=setTimeout(scheduleRender,250)}});
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.matches('input.num'))e.target.blur()});
+document.addEventListener('click',e=>{
+  const t=e.target.closest('button');if(!t)return;
+  if(t.id==='manageBtn'){S.manage=!S.manage;scheduleRender()}
+  else if(t.id==='addGradeBtn')addGradeDialog(currentView().dept);
+  else if(t.dataset.delGrade)delGradeDialog(t.dataset.delGrade);
+  else if(t.dataset.delWd)delWdDialog(t.dataset.delWd);
+});
+$('#addYearBtn').onclick=()=>addYearDialog();
+
+function addGradeDialog(dk){
+  const stages=[...new Set(gradesOf(dk).map(g=>g.stage))];
+  openModal({title:`إضافة صف إلى ${DEPT[dk].name}`,submit:'إضافة',body:`
+   <label class="wide">اسم الصف<input name="name" required maxlength="60"></label>
+   <label class="wide">المرحلة<input name="stage" list="stList" value="${esc(stages[stages.length-1]||'')}" maxlength="60"><datalist id="stList">${stages.map(s=>`<option value="${esc(s)}">`).join('')}</datalist></label>
+   <label>عدد الفصول<input name="sections" type="number" min="0" value="0"></label>
+   <label>الطاقة الاستيعابية<input name="capacity" type="number" min="0" value="0"></label>`,
+   onSubmit:async fd=>{
+     const name=String(fd.get('name')||'').trim();if(!name){toast('اكتب اسم الصف',true);return false}
+     const stage=String(fd.get('stage')||'').trim()||'—';
+     const list=gradesOf(dk);
+     // place after the last grade of the same stage
+     const sameIdx=list.map(g=>g.stage).lastIndexOf(stage);
+     const order=sameIdx>=0?num(list[sameIdx].order)+0.5:(list.length?num(list[list.length-1].order)+1:1);
+     const id=`${dk}-${Date.now().toString(36)}`;
+     await track(S.db.doc(`y/${S.yearId}/grades/${id}`).set({dept:dk,name,stage,order,sections:Math.max(0,Math.floor(num(fd.get('sections')))),capacity:Math.max(0,Math.floor(num(fd.get('capacity')))),current:0,waitlist:0,updatedAt:nowIso(),updatedBy:S.me||null,updatedByName:S.meName||""}));
+     addLog(`إضافة صف: ${DEPT[dk].name} · ${name}`);toast('تمت إضافة الصف');
+   }});
+}
+function delGradeDialog(id){
+  const g=S.grades[id];if(!g)return;
+  openModal({title:'حذف صف',danger:true,submit:'حذف الصف',body:`<p class="wide" style="margin:0">سيُحذف الصف <b>${esc(g.name)}</b> من ${esc(DEPT[g.dept]?.name)} مع أرقامه في هذا العام الدراسي. تبقى سجلات المنسحبين كما هي.</p>`,
+   onSubmit:async()=>{await track(S.db.doc(`y/${S.yearId}/grades/${id}`).delete());addLog(`حذف صف: ${DEPT[g.dept]?.name} · ${g.name}`);toast('تم حذف الصف')}});
+}
+function delWdDialog(id){
+  const w=S.wd.find(x=>x.id===id);if(!w)return;
+  openModal({title:'حذف سجل انسحاب',danger:true,submit:'حذف السجل',body:`<p class="wide" style="margin:0">سيُحذف سجل <b>${esc(w.name)}</b> (${esc(w.gradeName)}). لن يتغير عدد الطلاب الحاليين تلقائياً؛ عدّله من صفحة القسم إذا لزم.</p>`,
+   onSubmit:async()=>{await track(S.db.doc(`y/${S.yearId}/withdrawals/${id}`).delete());addLog(`حذف سجل منسحب: ${w.name} · ${w.gradeName}`);toast('تم حذف السجل')}});
+}
+function addYearDialog(){
+  const hasCur=Object.keys(S.grades).length>0;
+  openModal({title:'إضافة عام دراسي',submit:'إنشاء العام',body:`
+   <label class="wide">اسم العام الدراسي<input name="label" required placeholder="مثال: 1449 هـ" maxlength="40"></label>
+   ${hasCur?`<label class="chk wide"><input type="checkbox" name="copy" checked> نسخ الصفوف وعدد الفصول والطاقة الاستيعابية من العام الحالي (${esc(yearLabel())})</label>`:''}
+   <p class="small muted wide" style="margin:0">يبدأ العام الجديد بأعداد طلاب وقائمة انتظار = صفر.</p>`,
+   onSubmit:async fd=>{
+     const label=String(fd.get('label')||'').trim();if(!label){toast('اكتب اسم العام',true);return false}
+     if(S.years.some(y=>y.label===label)){toast('هذا العام موجود بالفعل',true);return false}
+     const id='y'+Date.now().toString(36);
+     const src=(hasCur&&fd.get('copy'))?Object.values(S.grades):DEPTS.flatMap(d=>d.grades.map((g,i)=>({id:`${d.key}-${String(i+1).padStart(2,'0')}`,dept:d.key,name:g[0],stage:g[1],order:i+1,sections:0,capacity:0})));
+     const order=Math.max(0,...S.years.map(y=>num(y.order)))+1;
+     setSync('busy','جاري إنشاء العام…');
+     for(const g of src){await S.db.doc(`y/${id}/grades/${g.id}`).set({dept:g.dept,name:g.name,stage:g.stage,order:g.order,sections:num(g.sections),capacity:num(g.capacity),current:0,waitlist:0,updatedAt:nowIso(),updatedBy:S.me||null,updatedByName:S.meName||""})}
+     await track(S.db.doc(`years/${id}`).set({label,order,createdAt:nowIso()}));
+     addLog(`إنشاء العام الدراسي ${label}`);
+     selectYear(id);toast('تم إنشاء العام الدراسي');
+   }});
+}
+
+/* ---------- export ---------- */
+function saveBlob(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500)}
+function deptRows(dk){return gradesOf(dk).map(g=>{const s=stat(g);return{stage:g.stage,name:g.name,sections:num(g.sections),capacity:num(g.capacity),current:num(g.current),vac:s.vac,status:s.label,waitlist:num(g.waitlist),wd:wdCount(dk,g.id)}})}
+$('#xlsBtn').onclick=async()=>{
+  if(typeof XLSX==='undefined'){toast('تعذّر تحميل أداة Excel. أعد فتح الصفحة.',true);return}
+  const wb=XLSX.utils.book_new();wb.Workbook={Views:[{RTL:true}]};
+  const sumAoa=[['القسم','عدد الفصول','الطاقة الاستيعابية','الطلاب الحاليون','المقاعد الشاغرة','الزيادة','نسبة الإشغال %','قائمة الانتظار','المنسحبون']];
+  DEPTS.forEach(d=>{const s=sum(gradesOf(d.key));sumAoa.push([d.name,s.sections,s.capacity,s.current,s.vacant,s.over,s.pct,s.waitlist,wdCount(d.key)])});
+  const T=sum(Object.values(S.grades));sumAoa.push(['الإجمالي',T.sections,T.capacity,T.current,T.vacant,T.over,T.pct,T.waitlist,S.wd.length]);
+  add(wb,'اللوحة التجميعية',sumAoa);
+  DEPTS.forEach(d=>{const aoa=[['المرحلة','الصف','عدد الفصول','الطاقة الاستيعابية','الطلاب الحاليون','المقاعد الشاغرة','الحالة']];
+    deptRows(d.key).forEach(r=>aoa.push([r.stage,r.name,r.sections,r.capacity,r.current,r.vac,r.status]));const s=sum(gradesOf(d.key));aoa.push(['','الإجمالي',s.sections,s.capacity,s.current,s.net,'']);add(wb,d.name,aoa)});
+  const wa=[['القسم','المرحلة','الصف','المقاعد الشاغرة','قائمة الانتظار']];DEPTS.forEach(d=>deptRows(d.key).forEach(r=>wa.push([d.name,r.stage,r.name,r.vac,r.waitlist])));add(wb,'قائمة الانتظار',wa);
+  const wd=[['اسم الطالب','القسم','المرحلة','الصف','تاريخ الانسحاب','الملاحظات']];S.wd.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')).forEach(w=>wd.push([w.name,DEPT[w.dept]?.name||w.dept,w.stage,w.gradeName,w.date,w.notes||'']));add(wb,'المنسحبون',wd);
+  const buf=XLSX.write(wb,{type:'array',bookType:'xlsx'});
+  saveBlob(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),`التسجيل-والطاقة-الاستيعابية-${yearLabel()}.xlsx`);
+  function add(wb,name,aoa){const ws=XLSX.utils.aoa_to_sheet(aoa);ws['!cols']=aoa[0].map((_,i)=>({wch:i<3?22:14}));ws['!views']=[{RTL:true}];XLSX.utils.book_append_sheet(wb,ws,name.replace(/[\\\/\?\*\[\]:]/g,'-').slice(0,31))}
+};
+$('#printBtn').onclick=async()=>{
+  let logo='';try{const b=await (await fetch('logos/company.png')).blob();logo=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(b)})}catch(e){}
+  const col={good:'#e5f4ec',warn:'#fdf1d6',crit:'#fbe4e8',off:'#fff'};
+  const T=sum(Object.values(S.grades));
+  let body=`<header>${logo?`<img src="${logo}" alt="">`:''}<div><h1>تقرير التسجيل والطاقة الاستيعابية</h1><p>مجمع المنار · العام الدراسي ${esc(yearLabel())} · ${esc(fmtTime(nowIso()))}</p></div></header>
+  <h2>الملخص</h2><table><tr><th>القسم</th><th>الفصول</th><th>الطاقة</th><th>الحاليون</th><th>الشاغرة</th><th>الزيادة</th><th>الإشغال</th><th>الانتظار</th><th>المنسحبون</th></tr>
+  ${DEPTS.map(d=>{const s=sum(gradesOf(d.key));return`<tr><td>${esc(d.name)}</td><td>${s.sections}</td><td>${s.capacity}</td><td>${s.current}</td><td>${s.vacant}</td><td>${s.over}</td><td>${s.pct}%</td><td>${s.waitlist}</td><td>${wdCount(d.key)}</td></tr>`}).join('')}
+  <tr class="t"><td>الإجمالي</td><td>${T.sections}</td><td>${T.capacity}</td><td>${T.current}</td><td>${T.vacant}</td><td>${T.over}</td><td>${T.pct}%</td><td>${T.waitlist}</td><td>${S.wd.length}</td></tr></table>`;
+  DEPTS.forEach(d=>{const s=sum(gradesOf(d.key));body+=`<h2>${esc(d.name)}</h2><table><tr><th>المرحلة</th><th>الصف</th><th>الفصول</th><th>الطاقة</th><th>الحاليون</th><th>الشاغرة</th><th>الانتظار</th><th>الحالة</th></tr>
+   ${gradesOf(d.key).map(g=>{const st=stat(g);return`<tr style="background:${col[st.k]}"><td>${esc(g.stage)}</td><td>${esc(g.name)}</td><td>${num(g.sections)}</td><td>${num(g.capacity)}</td><td>${num(g.current)}</td><td>${signed(st.vac)}</td><td>${num(g.waitlist)}</td><td>${st.label}</td></tr>`}).join('')}
+   <tr class="t"><td colspan="2">الإجمالي</td><td>${s.sections}</td><td>${s.capacity}</td><td>${s.current}</td><td>${signed(s.net)}</td><td>${s.waitlist}</td><td></td></tr></table>`});
+  if(S.wd.length)body+=`<h2>المنسحبون</h2><table><tr><th>الاسم</th><th>القسم</th><th>الصف</th><th>التاريخ</th><th>الملاحظات</th></tr>${S.wd.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(w=>`<tr><td>${esc(w.name)}</td><td>${esc(DEPT[w.dept]?.name)}</td><td>${esc(w.gradeName)}</td><td>${esc(w.date)}</td><td>${esc(w.notes||'')}</td></tr>`).join('')}</table>`;
+  const html=`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>تقرير ${esc(yearLabel())}</title><style>body{font-family:Tahoma,Arial,sans-serif;color:#1b1f3b;margin:24px;font-size:12px}header{display:flex;gap:16px;align-items:center;border-bottom:3px solid #232c6b;padding-bottom:10px}header img{height:56px}h1{margin:0;color:#232c6b;font-size:20px}h2{color:#232c6b;font-size:15px;margin:18px 0 6px;break-after:avoid}table{width:100%;border-collapse:collapse;break-inside:auto}th,td{border:1px solid #cfd3e3;padding:4px 6px;text-align:center}th{background:#232c6b;color:#fff}tr.t td{font-weight:bold;background:#e9ecf7}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}@page{size:A4;margin:12mm}</style></head><body>${body}<script>window.onload=function(){setTimeout(function(){window.print()},300)}<\/script></body></html>`;
+  const w=window.open('','_blank');
+  if(w){w.document.open();w.document.write(html);w.document.close()}
+  else{saveBlob(new Blob([html],{type:'text/html'}),`تقرير-التسجيل-${yearLabel()}.html`);toast('افتح الملف المحفوظ لتظهر نافذة الطباعة')}
+};
+
+/* tooltip for chart rows */
+document.addEventListener('mousemove',e=>{const r=e.target.closest&&e.target.closest('[data-tip]');const tip=$('#tip');
+  if(!r){tip.style.display='none';return}tip.textContent=r.getAttribute('data-tip');tip.style.whiteSpace='pre-line';tip.style.display='block';
+  const x=Math.min(e.clientX+14,innerWidth-tip.offsetWidth-8),y=Math.min(e.clientY+14,innerHeight-tip.offsetHeight-8);tip.style.left=x+'px';tip.style.top=y+'px'});
+
+/* ---------- data wiring ---------- */
+function selectYear(id){
+  if(!id||id===S.yearId)return;S.yearId=id;lsSet('andalus-year',id);
+  S.yearUnsubs.forEach(u=>u());S.yearUnsubs=[];S.grades={};S.wd=[];S.notes={};S.ready.grades=false;S.wdDraft=null;S.wdFilter={dept:'',grade:'',q:''};
+  const db=S.db;
+  S.yearUnsubs.push(db.collection(`y/${id}/grades`).onSnapshot(snap=>{const o={};snap.docs.forEach(d=>{o[d.id]={id:d.id,...d.data()}});S.grades=o;S.ready.grades=true;markLive(snap);scheduleRender()},onErr));
+  S.yearUnsubs.push(db.collection(`y/${id}/withdrawals`).onSnapshot(snap=>{S.wd=snap.docs.map(d=>({id:d.id,...d.data()}));scheduleRender()},onErr));
+  S.yearUnsubs.push(db.collection(`y/${id}/notes`).onSnapshot(snap=>{const o={};snap.docs.forEach(d=>o[d.id]=d.data());S.notes=o;scheduleRender()},onErr));
+  scheduleRender();
+}
+function markLive(snap){if(!snap.metadata.fromCache){clearTimeout(S.slowT);if(!pending)setSync('','متصل · البيانات محدّثة')}}
+function onErr(e){clearTimeout(S.slowT);if(e&&e.code==='permission-denied'){setGate('noaccess');return}setSync('err','انقطع الاتصال بالبيانات')}
+
+/* ---------- sign-in & roles (Firebase) ---------- */
+const lower=a=>(Array.isArray(a)?a:[]).map(x=>String(x).trim().toLowerCase()).filter(Boolean);
+function setGate(kind){
+  const u=S.authUser;
+  if(kind==='config')S.gate=`<div class="card empty"><p><b>لم يُضبط الاتصال بـ Firebase بعد.</b></p><p class="small">أضف إعدادات مشروعك في الملف firebase-config.js ثم أعد تحميل الصفحة.</p></div>`;
+  else if(kind==='signin')S.gate=`<div class="card empty" style="max-width:460px;margin:30px auto"><img src="logos/company.png" alt="شركة الأندلس التعليمية" style="width:200px;max-width:100%"><h2 style="font-family:var(--display);color:var(--navy);justify-content:center">نظام التسجيل والطاقة الاستيعابية</h2><p class="small">سجّل الدخول بحساب Google المعتمد لدى إدارة المدرسة.</p><button class="btn pri" id="signInBtn">تسجيل الدخول بحساب Google</button></div>`;
+  else if(kind==='noaccess')S.gate=`<div class="card empty"><p><b>ليس لهذا الحساب صلاحية الدخول.</b></p><p class="small">الحساب: <span dir="ltr">${esc(u&&u.email)}</span>. اطلب من المدير إضافة بريدك في صفحة «المستخدمون والصلاحيات».</p></div>`;
+  else S.gate=null;
+  if(kind&&kind!=='none'){clearTimeout(S.slowT);setSync(kind==='noaccess'?'err':'',kind==='noaccess'?'لا توجد صلاحية':'غير متصل')}
+  scheduleRender();
+}
+async function signIn(){
+  try{await firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider())}
+  catch(e){if(e&&e.code==='auth/popup-blocked'){firebase.auth().signInWithRedirect(new firebase.auth.GoogleAuthProvider())}else if(e&&e.code!=='auth/popup-closed-by-user'&&e.code!=='auth/cancelled-popup-request')toast('تعذّر تسجيل الدخول: '+(e.code||''),true)}
+}
+$('#signOutBtn').onclick=()=>firebase.auth().signOut();
+function startData(){
+  if(S.started)return;S.started=true;const db=S.db;
+  S.slowT=setTimeout(()=>{S.slow=true;setSync('err','تعذّر الوصول للبيانات حتى الآن');scheduleRender()},10000);
+  S.globalUnsubs=[
+   db.collection('years').onSnapshot(snap=>{
+    S.years=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>num(b.order)-num(a.order));S.ready.years=true;markLive(snap);
+    if(!S.yearId||!S.years.some(y=>y.id===S.yearId)){const saved=lsGet('andalus-year');const pick=S.years.find(y=>y.id===saved)||S.years[0];if(pick)selectYear(pick.id)}
+    scheduleRender();
+   },onErr),
+   db.collection('log').orderBy('at','desc').limit(300).onSnapshot(snap=>{S.log=snap.docs.map(d=>({id:d.id,...d.data()}));scheduleRender()},()=>{})
+  ];
+}
+function stopData(){(S.globalUnsubs||[]).forEach(u=>u());S.yearUnsubs.forEach(u=>u());S.globalUnsubs=[];S.yearUnsubs=[];S.started=false;S.yearId=null;S.years=[];S.grades={};S.wd=[];S.log=[];S.ready={years:false,grades:false}}
+function updateChip(){const chip=$('#roleChip');chip.textContent=S.canEdit?'صلاحية التعديل':'مشاهدة فقط';chip.className='chip'+(S.canEdit?'':' view')}
+
+/* users & roles page */
+function viewUsers(){
+  const r=S.roles||{};
+  return`<div class="card"><h2>المستخدمون والصلاحيات <span class="note">بريد Google واحد في كل سطر</span></h2>
+  <div class="form">
+   <label class="wide">صلاحية التعديل (المدير العام، القبول والتسجيل)<textarea class="notes" id="rolesEditors" dir="ltr">${esc(lower(r.editors).join('\n'))}</textarea></label>
+   <label class="wide">صلاحية المشاهدة فقط<textarea class="notes" id="rolesViewers" dir="ltr">${esc(lower(r.viewers).join('\n'))}</textarea></label>
+   <div><button class="btn pri" id="saveRoles">حفظ الصلاحيات</button></div></div>
+  <p class="small muted" style="margin:10px 0 0">من يسجّل الدخول ببريد غير موجود في القائمتين لن يرى أي بيانات. لا يمكنك حذف بريدك من قائمة التعديل.</p></div>`;
+}
+function bindUsers(){
+  const b=$('#saveRoles');if(!b)return;
+  b.onclick=async()=>{
+    const parse=id=>[...new Set(lower($(id).value.split(/[\s,;]+/)).filter(x=>/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x)))];
+    const editors=parse('#rolesEditors');const me=(S.authUser.email||'').toLowerCase();if(!editors.includes(me))editors.unshift(me);
+    const viewers=parse('#rolesViewers').filter(x=>!editors.includes(x));
+    b.disabled=true;
+    try{await track(S.db.doc('config/roles').set({editors,viewers,updatedAt:nowIso(),updatedByName:S.meName||''}));addLog(`تحديث الصلاحيات: ${editors.length} للتعديل، ${viewers.length} للمشاهدة`);toast('تم حفظ الصلاحيات')}
+    catch(e){toast(errMsg(e),true)}finally{b.disabled=false}
+  };
+}
+
+/* first-year seed (from the previous spreadsheet) */
+const SEED_AHLIB={'ثالث ابتدائي':[3,75,70],'رابع ابتدائي':[3,75,76],'خامس ابتدائي':[3,75,77],'سادس ابتدائي':[3,75,66],'أول متوسط':[3,75,74],'ثاني متوسط':[3,75,74],'ثالث متوسط':[3,75,62],'أول ثانوي':[2,50,48]};
+async function seedFirstYear(){
+  const b=$('#seedYear');if(b)b.disabled=true;
+  try{
+    const batch=S.db.batch();const id='y1448';
+    DEPTS.forEach(d=>d.grades.forEach((g,i)=>{const v=(d.key==='ahlib'&&SEED_AHLIB[g[0]])||[0,0,0];
+      batch.set(S.db.doc(`y/${id}/grades/${d.key}-${String(i+1).padStart(2,'0')}`),{dept:d.key,name:g[0],stage:g[1],order:i+1,sections:v[0],capacity:v[1],current:v[2],waitlist:0,updatedAt:nowIso(),updatedBy:S.me||null,updatedByName:S.meName||''})}));
+    batch.set(S.db.doc(`years/${id}`),{label:'1448 هـ',order:1,createdAt:nowIso()});
+    await track(batch.commit());addLog('إنشاء العام الدراسي 1448 هـ بالبيانات الأولية');toast('تم إنشاء العام الدراسي');
+  }catch(e){toast(errMsg(e),true);if(b)b.disabled=false}
+}
+
+(function init(){
+  renderNav();
+  if(typeof firebase==='undefined'||!window.FIREBASE_CONFIG||!FIREBASE_CONFIG.apiKey||/ضع|YOUR/.test(FIREBASE_CONFIG.apiKey)){setGate('config');return}
+  firebase.initializeApp(FIREBASE_CONFIG);
+  S.db=firebase.firestore();
+  firebase.auth().onAuthStateChanged(u=>{
+    if(S.rolesUnsub){S.rolesUnsub();S.rolesUnsub=null}
+    stopData();S.authUser=u;
+    $('#signOutBtn').hidden=!u;$('#whoName').textContent=u?(u.displayName||u.email):'';
+    if(!u){S.canEdit=false;S.me=null;S.meName='';$('#roleChip').textContent='غير مسجّل';setGate('signin');return}
+    S.me=u.uid;S.meName=u.displayName||u.email;S.gate=null;setSync('busy','جاري التحقق من الصلاحية…');
+    S.rolesUnsub=S.db.doc('config/roles').onSnapshot(snap=>{
+      const r=snap.data()||{};S.roles=r;const em=(u.email||'').toLowerCase();
+      S.canEdit=lower(r.editors).includes(em);const can=S.canEdit||lower(r.viewers).includes(em);
+      updateChip();
+      if(!can){stopData();setGate('noaccess');return}
+      setGate(null);startData();scheduleRender();
+    },e=>{stopData();setGate('noaccess')});
+  });
+})();
+</script>
+</body>
+</html>
