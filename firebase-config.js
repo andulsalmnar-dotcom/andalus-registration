@@ -1,10 +1,9 @@
-// إعدادات مشروع Firebase — تُنسخ من: Firebase Console ← Project settings ← Your apps ← Web app ← Config
-// هذه القيم ليست سرية؛ الحماية تتم عبر قواعد Firestore (firestore.rules).
+// إعدادات مشروع Firebase — هذه القيم ليست سرية؛ الحماية تتم عبر قواعد Firestore (firestore.rules).
 window.FIREBASE_CONFIG = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "",
-  appId: ""
+  apiKey: "AIzaSyCeVe_JbIQ_eTL_PP5u3wWOwe5aDr9JCPM",
+  authDomain: "andalus-registration.firebaseapp.com",
+  projectId: "andalus-registration",
+  storageBucket: "andalus-registration.firebasestorage.app",
+  messagingSenderId: "83800733833",
+  appId: "1:83800733833:web:26364d4a4bb4007f672e58"
 };
