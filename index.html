@@ -154,6 +154,22 @@ textarea.notes{width:100%;min-height:90px;border:1px solid var(--line);border-ra
 .iconbtn svg{width:16px;height:16px;stroke:currentColor}
 a.rowlink{color:var(--navy);font-weight:700;text-decoration:none}
 a.rowlink:hover{text-decoration:underline}
+button.tile{font:inherit;color:inherit;text-align:start;cursor:pointer;width:100%;border-inline:1px solid var(--line);border-bottom:1px solid var(--line);transition:box-shadow .15s,transform .15s}
+button.tile:hover{box-shadow:0 4px 14px rgba(35,44,107,.12);transform:translateY(-1px)}
+button.tile.on{box-shadow:0 0 0 2px var(--navy) inset;background:#f7f8fd}
+button.tile .more{font-size:11.5px;color:var(--navy);font-weight:600;margin-top:2px}
+.detail h2 .x{margin-inline-start:auto}
+.dgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px}
+.dcard{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
+.dcard h3{margin:0;padding:9px 12px;background:var(--navy);color:#fff;font-size:14px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.dcard h3 span{font-variant-numeric:tabular-nums;background:rgba(255,255,255,.16);border-radius:20px;padding:0 9px;font-size:13px}
+table.mini td{padding:5px 10px}
+table.mini td.name{font-weight:500}
+tr.stagerow td{background:var(--tint);font-weight:700;color:var(--navy)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.chips button{border:1px solid var(--line);background:#fff;border-radius:20px;padding:3px 11px;font-size:12.5px;font-weight:600;cursor:pointer;color:var(--muted)}
+.chips button.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.scroll{max-height:440px;overflow:auto}
 @media (max-width:980px){.grid2{grid-template-columns:1fr}}
 @media (max-width:820px){
   .app{grid-template-columns:1fr}
@@ -214,8 +230,8 @@ const DEPTS=[
  {key:'intlb',hash:'intl-boys',name:'العالمي - بنين',logo:'intl',kind:'العالمي',grades:[
   ['G3','المرحلة الابتدائية'],['G4','المرحلة الابتدائية'],['G5','المرحلة الابتدائية'],['G6','المرحلة الابتدائية'],['G7','المرحلة المتوسطة']]},
  {key:'ahlig',hash:'ahli-girls',name:'الأهلي - بنات',logo:'ahli',kind:'الأهلي',grades:[
-  ['براعم القرآن بنات','المرحلة الابتدائية'],['براعم القرآن بنين','المرحلة الابتدائية'],['أول ابتدائي','المرحلة الابتدائية'],['أول إسناد','المرحلة الابتدائية'],
-  ['ثاني ابتدائي','المرحلة الابتدائية'],['ثاني إسناد','المرحلة الابتدائية'],['براعم القرآن بنات 2','المرحلة الابتدائية'],['براعم القرآن بنين 2','المرحلة الابتدائية'],
+  ['أول ابتدائي براعم القرآن بنات','المرحلة الابتدائية'],['أول ابتدائي براعم القرآن إسناد','المرحلة الابتدائية'],['أول ابتدائي','المرحلة الابتدائية'],['أول ابتدائي إسناد','المرحلة الابتدائية'],
+  ['ثاني ابتدائي','المرحلة الابتدائية'],['ثاني ابتدائي إسناد','المرحلة الابتدائية'],['ثاني ابتدائي براعم القرآن بنات','المرحلة الابتدائية'],['ثاني ابتدائي براعم القرآن إسناد','المرحلة الابتدائية'],
   ['ثالث ابتدائي','المرحلة الابتدائية'],['رابع ابتدائي','المرحلة الابتدائية'],['خامس ابتدائي','المرحلة الابتدائية'],['سادس ابتدائي','المرحلة الابتدائية'],
   ['أول متوسط','المتوسطة والثانوية'],['ثاني متوسط','المتوسطة والثانوية'],['ثالث متوسط','المتوسطة والثانوية'],['أول ثانوي','المتوسطة والثانوية']]},
  {key:'intlg',hash:'intl-girls',name:'العالمي - بنات',logo:'intl',kind:'العالمي',grades:[
@@ -350,6 +366,46 @@ function renderYears(){
 }
 const legendHtml=`<div class="legend"><span class="pill good">مفتوح للتسجيل</span><span class="pill warn">اعتذار من الزيادة · 3 مقاعد أو أقل</span><span class="pill crit">إغلاق التسجيل · لا مقاعد أو زيادة</span></div>`;
 
+function dTile(k,cls,label,val,hint){
+  return`<button type="button" class="tile ${cls} ${S.dashDetail===k?'on':''}" data-detail="${k}" aria-expanded="${S.dashDetail===k}"><div class="l">${label}</div><div class="v">${val}</div>${hint?`<div class="h">${hint}</div>`:''}<div class="more">${S.dashDetail===k?'إخفاء التفاصيل ▲':'عرض التفاصيل ▼'}</div></button>`;
+}
+function dashTilesHtml(t){
+  return`<div class="tiles">${dTile('sections','','عدد الفصول',fmt(t.sections))}${dTile('capacity','b','الطاقة الاستيعابية',fmt(t.capacity))}${dTile('current','p','الطلاب الحاليون',fmt(t.current),'نسبة الإشغال '+t.pct+'%')}${dTile('vacant','ok','المقاعد الشاغرة',fmt(t.vacant))}${dTile('over','cr','الزيادة عن الطاقة',fmt(t.over),fmt(t.closed)+' صف مغلق')}${dTile('waitlist','g','قائمة الانتظار',fmt(t.waitlist))}${dTile('wd','','المنسحبون',fmt(S.wd.length))}</div>`;
+}
+const DETAIL_TITLE={sections:'عدد الفصول حسب الصف',capacity:'الطاقة الاستيعابية حسب الصف',current:'نسبة الإشغال في كل مرحلة',vacant:'المراحل التي بها مقاعد شاغرة',over:'المراحل التي بها زيادة عن الطاقة',waitlist:'قائمة الانتظار حسب الصف',wd:'المنسحبون حسب القسم والمرحلة'};
+function detailHtml(k){
+  const all=DEPTS.flatMap(d=>gradesOf(d.key));
+  let body='';let note='';
+  if(k==='sections'||k==='capacity'){
+    note=S.canEdit?'عدّل الرقم مباشرة، ويُحفظ عند الخروج من الخانة':'';
+    body=`<div class="dgrid">${DEPTS.map(d=>{const list=gradesOf(d.key);const s=sum(list);
+      return`<div class="dcard"><h3>${esc(d.name)}<span>${fmt(s[k])}</span></h3><table class="mini"><tbody>${list.map(g=>`<tr><td class="name">${esc(g.name)}</td><td>${cellNum(g,k)}</td></tr>`).join('')||'<tr><td class="muted">لا توجد صفوف</td></tr>'}</tbody></table></div>`}).join('')}</div>`;
+  } else if(k==='current'){
+    note='الطلاب الحاليون ÷ الطاقة الاستيعابية';
+    body=`<div class="dgrid">${DEPTS.map(d=>{const list=gradesOf(d.key);const s=sum(list);let rows='';
+      const stages=[];list.forEach(g=>{if(!stages.includes(g.stage))stages.push(g.stage)});
+      stages.forEach(st=>{const gl=list.filter(g=>g.stage===st);const ss=sum(gl);
+        rows+=`<tr class="stagerow"><td class="name">${esc(st)}</td><td>${fmt(ss.current)}/${fmt(ss.capacity)}</td><td>${occ(ss.current,ss.capacity)}</td></tr>`;
+        rows+=gl.map(g=>`<tr class="r-${stat(g).k}"><td class="name">${esc(g.name)}</td><td>${fmt(g.current)}/${fmt(g.capacity)}</td><td>${occ(num(g.current),num(g.capacity))}</td></tr>`).join('')});
+      return`<div class="dcard"><h3>${esc(d.name)}<span>${s.pct}%</span></h3><table class="mini"><tbody>${rows||'<tr><td class="muted">لا توجد صفوف</td></tr>'}</tbody></table></div>`}).join('')}</div>`;
+  } else if(k==='vacant'){
+    const list=all.filter(g=>stat(g).vac>0);
+    note=`${fmt(list.length)} صف`;
+    body=list.length?`<div class="tw scroll"><table><thead><tr><th>القسم</th><th>المرحلة</th><th>الصف</th><th>الطاقة</th><th>الحاليون</th><th>المقاعد الشاغرة</th><th>قائمة الانتظار</th><th>الحالة</th></tr></thead><tbody>${list.map(g=>{const s=stat(g);return`<tr class="r-${s.k}"><td>${esc(DEPT[g.dept].name)}</td><td class="small muted">${esc(g.stage)}</td><td class="name">${esc(g.name)}</td><td>${fmt(g.capacity)}</td><td>${fmt(g.current)}</td><td class="vac ${s.k}">${fmt(s.vac)}</td><td>${fmt(g.waitlist)}</td><td><span class="pill ${s.k}">${s.label}</span></td></tr>`}).join('')}<tr class="tot"><td colspan="5">الإجمالي</td><td>${fmt(list.reduce((a,g)=>a+stat(g).vac,0))}</td><td>${fmt(list.reduce((a,g)=>a+num(g.waitlist),0))}</td><td></td></tr></tbody></table></div>`:'<p class="empty">لا توجد مقاعد شاغرة في أي صف.</p>';
+  } else if(k==='over'){
+    const list=all.filter(g=>stat(g).vac<0);
+    note=`${fmt(list.length)} صف`;
+    body=list.length?`<div class="tw scroll"><table><thead><tr><th>القسم</th><th>المرحلة</th><th>الصف</th><th>الطاقة</th><th>الحاليون</th><th>الزيادة</th></tr></thead><tbody>${list.map(g=>{const s=stat(g);return`<tr class="r-crit"><td>${esc(DEPT[g.dept].name)}</td><td class="small muted">${esc(g.stage)}</td><td class="name">${esc(g.name)}</td><td>${fmt(g.capacity)}</td><td>${fmt(g.current)}</td><td class="vac crit">${fmt(-s.vac)}</td></tr>`}).join('')}<tr class="tot"><td colspan="5">الإجمالي</td><td>${fmt(list.reduce((a,g)=>a-stat(g).vac,0))}</td></tr></tbody></table></div>`:'<p class="empty">لا يوجد أي صف زاد عن طاقته الاستيعابية.</p>';
+  } else if(k==='waitlist'){
+    const list=all.filter(g=>num(g.waitlist)>0);
+    note=`${fmt(list.length)} صف`;
+    body=(list.length?`<div class="tw scroll"><table><thead><tr><th>القسم</th><th>الصف</th><th>المقاعد الشاغرة</th><th>قائمة الانتظار</th><th>التنبيه</th></tr></thead><tbody>${list.map(g=>{const s=stat(g);return`<tr class="${s.vac>0?'r-good':''}"><td>${esc(DEPT[g.dept].name)}</td><td class="name">${esc(g.name)}</td><td class="vac ${s.k}">${signed(s.vac)}</td><td>${fmt(g.waitlist)}</td><td>${s.vac>0?`<span class="pill good">يمكن قبول ${fmt(Math.min(s.vac,num(g.waitlist)))}</span>`:'<span class="pill crit">لا مقاعد شاغرة</span>'}</td></tr>`}).join('')}</tbody></table></div>`:'<p class="empty">لا يوجد طلاب في قائمة الانتظار.</p>')+`<p style="margin:10px 0 0"><a class="rowlink" href="#waitlist">فتح صفحة قائمة الانتظار</a></p>`;
+  } else if(k==='wd'){
+    body=`<div class="dgrid">${DEPTS.map(d=>{const stages=stageOrder(d.key);
+      return`<div class="dcard"><h3>${esc(d.name)}<span>${fmt(wdCount(d.key))}</span></h3><table class="mini"><tbody>${stages.map(st=>`<tr><td class="name">${esc(st)}</td><td>${fmt(S.wd.filter(w=>w.dept===d.key&&w.stage===st).length)}</td></tr>`).join('')}</tbody></table></div>`}).join('')}</div><p style="margin:10px 0 0"><a class="rowlink" href="#withdrawals">فتح جدول المنسحبين</a></p>`;
+  }
+  return`<div class="card detail" id="detailCard"><h2>${esc(DETAIL_TITLE[k])} <span class="note">${note}</span><button type="button" class="btn sm x" data-close-detail>إغلاق</button></h2>${body}</div>`;
+}
 function tilesHtml(t,extra){
   return `<div class="tiles">
    <div class="tile"><div class="l">عدد الفصول</div><div class="v">${fmt(t.sections)}</div></div>
@@ -369,7 +425,8 @@ function viewDashboard(){
   const all=Object.values(S.grades);const t=sum(all);
   if(!S.ready.grades)return`<div class="card empty">جاري تحميل الصفوف…</div>`;
   const rows=DEPTS.map(d=>{const s=sum(gradesOf(d.key));return{d,s}});
-  let h=tilesHtml(t,`<div class="tile g"><div class="l">قائمة الانتظار</div><div class="v">${fmt(t.waitlist)}</div></div><div class="tile"><div class="l">المنسحبون</div><div class="v">${fmt(S.wd.length)}</div></div>`);
+  let h=dashTilesHtml(t);
+  if(S.dashDetail)h+=detailHtml(S.dashDetail);
   h+=waitAlertHtml(all,true);
   h+=`<div class="card"><h2>ملخص الأقسام <span class="note">العام الدراسي ${esc(yearLabel())}</span></h2><div class="tw"><table><thead><tr><th>القسم</th><th>عدد الفصول</th><th>الطاقة الاستيعابية</th><th>الطلاب الحاليون</th><th>المقاعد الشاغرة</th><th>الزيادة</th><th>نسبة الإشغال</th><th>قائمة الانتظار</th><th>المنسحبون</th><th>صفوف مغلقة</th></tr></thead><tbody>
   ${rows.map(({d,s})=>`<tr><td class="name"><a class="rowlink" href="#${d.hash}">${esc(d.name)}</a></td><td>${fmt(s.sections)}</td><td>${fmt(s.capacity)}</td><td>${fmt(s.current)}</td><td class="vac good">${fmt(s.vacant)}</td><td class="vac ${s.over?'crit':''}">${fmt(s.over)}</td><td>${occ(s.current,s.capacity)}</td><td>${fmt(s.waitlist)}</td><td>${fmt(wdCount(d.key))}</td><td>${s.closed?`<span class="pill crit">${fmt(s.closed)}</span>`:'<span class="muted">0</span>'}</td></tr>`).join('')}
@@ -381,8 +438,13 @@ function viewDashboard(){
    ${rows.map(({d,s})=>`<div class="row" data-tip="${esc(d.name)}&#10;الطاقة: ${fmt(s.capacity)} · الحاليون: ${fmt(s.current)}&#10;الشاغرة: ${fmt(s.vacant)} · الزيادة: ${fmt(s.over)}"><div class="lab">${esc(d.name)}</div><div class="track"><div class="fill ${s.pct>100?'over':''}" style="width:${s.capacity?Math.min(s.pct,scale)/scale*100:0}%"></div><div class="grid" style="inset-inline-start:${100/scale*100}%"></div></div><div class="val">${s.pct}% · ${fmt(s.current)}/${fmt(s.capacity)}</div></div>`).join('')}
    <div class="axis"><div></div><div>${ticks.map(x=>`<span>${x}%</span>`).join('')}</div><div></div></div>
    <p class="small muted" style="margin:8px 0 0">الخط الرأسي = 100% من الطاقة الاستيعابية. الشريط الأحمر يعني تجاوز الطاقة.</p></div>`;
-  const closed=all.filter(g=>stat(g).k==='crit'||stat(g).k==='warn').sort((a,b)=>stat(a).vac-stat(b).vac);
-  const closedHtml=`<div class="card"><h2>صفوف تحتاج انتباه</h2>${closed.length?`<div class="tw"><table><thead><tr><th>القسم</th><th>الصف</th><th>الشاغرة</th><th>الحالة</th></tr></thead><tbody>${closed.map(g=>{const s=stat(g);return`<tr><td>${esc(DEPT[g.dept]?.name)}</td><td class="name">${esc(g.name)}</td><td class="vac ${s.k}">${signed(s.vac)}</td><td><span class="pill ${s.k}">${s.label}</span></td></tr>`}).join('')}</tbody></table></div>`:'<p class="muted">كل الصفوف المفعّلة بها أكثر من 3 مقاعد شاغرة.</p>'}</div>`;
+  const active=DEPTS.flatMap(d=>gradesOf(d.key)).filter(g=>stat(g).k!=='off');
+  const rank={crit:0,warn:1,good:2};
+  const cnt={all:active.length,crit:0,warn:0,good:0};active.forEach(g=>cnt[stat(g).k]++);
+  const af=S.attn||'all';
+  const shown=active.filter(g=>af==='all'||stat(g).k===af).sort((a,b)=>rank[stat(a).k]-rank[stat(b).k]||stat(a).vac-stat(b).vac);
+  const chip=(k,l)=>`<button type="button" class="${af===k?'on':''}" data-attn="${k}">${l} (${fmt(cnt[k])})</button>`;
+  const closedHtml=`<div class="card"><h2>صفوف تحتاج انتباه</h2><div class="chips">${chip('all','الكل')}${chip('crit','إغلاق التسجيل')}${chip('warn','اعتذار من الزيادة')}${chip('good','مفتوح للتسجيل')}</div>${shown.length?`<div class="tw scroll"><table><thead><tr><th>القسم</th><th>الصف</th><th>الشاغرة</th><th>الحالة</th></tr></thead><tbody>${shown.map(g=>{const s=stat(g);return`<tr><td>${esc(DEPT[g.dept]?.name)}</td><td class="name">${esc(g.name)}</td><td class="vac ${s.k}">${signed(s.vac)}</td><td><span class="pill ${s.k}">${s.label}</span></td></tr>`}).join('')}</tbody></table></div>`:'<p class="muted">لا توجد صفوف في هذه الحالة.</p>'}</div>`;
   h+=`<div class="grid2">${chart}${closedHtml}</div>`;
   return h;
 }
@@ -541,7 +603,10 @@ document.addEventListener('input',e=>{if(e.target.id==='wdQ'){S.wdFilter.q=e.tar
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.matches('input.num'))e.target.blur()});
 document.addEventListener('click',e=>{
   const t=e.target.closest('button');if(!t)return;
-  if(t.id==='manageBtn'){S.manage=!S.manage;scheduleRender()}
+  if(t.dataset.detail){S.dashDetail=S.dashDetail===t.dataset.detail?null:t.dataset.detail;scheduleRender();if(S.dashDetail)requestAnimationFrame(()=>requestAnimationFrame(()=>{const c=$('#detailCard');if(c)c.scrollIntoView({behavior:'smooth',block:'nearest'})}))}
+  else if(t.hasAttribute('data-close-detail')){S.dashDetail=null;scheduleRender()}
+  else if(t.dataset.attn){S.attn=t.dataset.attn;scheduleRender()}
+  else if(t.id==='manageBtn'){S.manage=!S.manage;scheduleRender()}
   else if(t.id==='addGradeBtn')addGradeDialog(currentView().dept);
   else if(t.dataset.delGrade)delGradeDialog(t.dataset.delGrade);
   else if(t.dataset.delWd)delWdDialog(t.dataset.delWd);
@@ -643,10 +708,18 @@ function selectYear(id){
   if(!id||id===S.yearId)return;S.yearId=id;lsSet('andalus-year',id);
   S.yearUnsubs.forEach(u=>u());S.yearUnsubs=[];S.grades={};S.wd=[];S.notes={};S.ready.grades=false;S.wdDraft=null;S.wdFilter={dept:'',grade:'',q:''};
   const db=S.db;
-  S.yearUnsubs.push(db.collection(`y/${id}/grades`).onSnapshot(snap=>{const o={};snap.docs.forEach(d=>{o[d.id]={id:d.id,...d.data()}});S.grades=o;S.ready.grades=true;markLive(snap);scheduleRender()},onErr));
+  S.yearUnsubs.push(db.collection(`y/${id}/grades`).onSnapshot(snap=>{const o={};snap.docs.forEach(d=>{o[d.id]={id:d.id,...d.data()}});S.grades=o;S.ready.grades=true;markLive(snap);scheduleRender();migrateNames()},onErr));
   S.yearUnsubs.push(db.collection(`y/${id}/withdrawals`).onSnapshot(snap=>{S.wd=snap.docs.map(d=>({id:d.id,...d.data()}));scheduleRender()},onErr));
   S.yearUnsubs.push(db.collection(`y/${id}/notes`).onSnapshot(snap=>{const o={};snap.docs.forEach(d=>o[d.id]=d.data());S.notes=o;scheduleRender()},onErr));
   scheduleRender();
+}
+const RENAME_AHLIG={'براعم القرآن بنات':'أول ابتدائي براعم القرآن بنات','براعم القرآن بنين':'أول ابتدائي براعم القرآن إسناد','أول إسناد':'أول ابتدائي إسناد','ثاني إسناد':'ثاني ابتدائي إسناد','براعم القرآن بنات 2':'ثاني ابتدائي براعم القرآن بنات','براعم القرآن بنين 2':'ثاني ابتدائي براعم القرآن إسناد'};
+async function migrateNames(){
+  if(!S.canEdit||S.migrated===S.yearId)return;S.migrated=S.yearId;
+  const todo=Object.values(S.grades).filter(g=>g.dept==='ahlig'&&RENAME_AHLIG[g.name]);if(!todo.length)return;
+  try{for(const g of todo){const nn=RENAME_AHLIG[g.name];await S.db.doc(`y/${S.yearId}/grades/${g.id}`).update({name:nn});
+      for(const w of S.wd.filter(w=>w.gradeId===g.id))await S.db.doc(`y/${S.yearId}/withdrawals/${w.id}`).update({gradeName:nn})}
+    addLog('تحديث أسماء صفوف الأهلي بنات');}catch(e){}
 }
 function markLive(snap){if(!snap.metadata.fromCache){clearTimeout(S.slowT);if(!pending)setSync('','متصل · البيانات محدّثة')}}
 function onErr(e){clearTimeout(S.slowT);if(e&&e.code==='permission-denied'){setGate('noaccess');return}setSync('err','انقطع الاتصال بالبيانات')}
